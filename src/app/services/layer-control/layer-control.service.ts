@@ -91,8 +91,14 @@ export class LayerControlService {
 
   async initLayers() {
     const mbtilesFiles = [
-      { name: 'countries-raster', url: '/assets/countries-raster.mbtiles' },
-      { name: 'РазрешениеНаВВод', url: '/assets/РазрешениеНаВВод.mbtiles' },
+      {
+        name: 'countries-raster',
+        url: '/mobile/assets/countries-raster.mbtiles',
+      },
+      {
+        name: 'РазрешениеНаВВод',
+        url: '/mobile/assets/РазрешениеНаВВод.mbtiles',
+      },
     ];
 
     for (const file of mbtilesFiles) {

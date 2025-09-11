@@ -19,7 +19,7 @@ export class AppComponent implements AfterViewInit {
     initSqlJs({
       // Required to load the wasm binary asynchronously. Of course, you can host it wherever you want
       // You can omit locateFile completely when running in node
-      locateFile: (file: any) => `/assets/sql-wasm.wasm`,
+      locateFile: (file: any) => `/mobile/assets/sql-wasm.wasm`,
     }).then((sql) => {
       (window as any).SQL = sql;
 
