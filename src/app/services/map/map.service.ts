@@ -13,9 +13,9 @@ export class MapService implements OnDestroy {
 
   initializeMap(
     containerId: string,
-    lat: number = 55.7558,
-    lng: number = 37.6173,
-    zoom: number = 10
+    lat: number = 58.010455,
+    lng: number = 56.229443,
+    zoom: number = 12
   ): void {
     if (this.map) {
       console.warn('Map already initialized');

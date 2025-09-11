@@ -11,8 +11,13 @@ export class LayerControlService {
   private baseLayers: { [name: string]: L.TileLayer } = {};
   private layers: { [name: string]: L.Layer } = {};
   private map: L.Map | null = null;
+  private idbName = 'mbtilesStorage';
+  private idbVersion = 1;
+  private idb: IDBDatabase | null = null;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {
+    this.initDatabase();
+  }
 
   initializeControl(
     map: L.Map,
@@ -24,40 +29,96 @@ export class LayerControlService {
     collapsed: boolean = false
   ): void {
     this.map = map;
-
     this.layersControl = L.control
-      .layers(this.baseLayers, this.layers, {
-        position,
-        collapsed,
-      })
+      .layers(this.baseLayers, this.layers, { position, collapsed })
       .addTo(map);
-
     this.initBaseLayers();
     this.initLayers();
   }
 
-  initLayers() {
-    let countriesRaster = new MBTiles(
-      '/assets/countries-raster.mbtiles',
-      {}
-    ) as L.TileLayer;
+  private async initDatabase(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.idbName, this.idbVersion);
 
-    let layer2 = new MBTiles(
-      '/assets/РазрешениеНаВВод.mbtiles',
-      {}
-    ) as L.TileLayer;
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.idb = request.result;
+        resolve();
+      };
 
-    // Необязательные подписки
-    countriesRaster.on('databaseloaded', function (ev: any) {
-      console.info('MBTiles DB loaded', ev);
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('mbtiles')) {
+          db.createObjectStore('mbtiles', { keyPath: 'name' });
+        }
+      };
     });
-    countriesRaster.on('databaseerror', function (ev: any) {
-      console.info('MBTiles DB error', ev);
-    });
+  }
 
-    // Добавляем слои через сервис
-    this.addLayer('countries-raster', countriesRaster);
-    this.addLayer('Разрешение На ВВод', layer2);
+  private async getLayerFromIDB(name: string): Promise<ArrayBuffer | null> {
+    if (!this.idb) return null;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb!.transaction(['mbtiles'], 'readonly');
+      const store = transaction.objectStore('mbtiles');
+      const request = store.get(name);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        resolve(request.result ? request.result.data : null);
+      };
+    });
+  }
+
+  private async saveLayerToIDB(name: string, data: ArrayBuffer): Promise<void> {
+    if (!this.idb) return;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb!.transaction(['mbtiles'], 'readwrite');
+      const store = transaction.objectStore('mbtiles');
+      const request = store.put({ name, data });
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }
+
+  private async loadLayerFromFile(
+    url: string
+  ): Promise<ArrayBuffer | undefined> {
+    return this.http.get(url, { responseType: 'arraybuffer' }).toPromise();
+  }
+
+  async initLayers() {
+    const mbtilesFiles = [
+      { name: 'countries-raster', url: '/assets/countries-raster.mbtiles' },
+      { name: 'РазрешениеНаВВод', url: '/assets/РазрешениеНаВВод.mbtiles' },
+    ];
+
+    for (const file of mbtilesFiles) {
+      // Проверяем наличие в IndexedDB
+      let fileData = (await this.getLayerFromIDB(file.name)) as ArrayBuffer;
+
+      // Если нет в базе - загружаем и сохраняем
+      if (!fileData) {
+        fileData = (await this.loadLayerFromFile(file.url)) as ArrayBuffer;
+        await this.saveLayerToIDB(file.name, fileData);
+      }
+
+      // Создаем слой из данных
+      const layer = new MBTiles(fileData, {}) as L.TileLayer;
+
+      // Необязательные обработчики на mbtiles
+      layer.on('databaseloaded', (ev: any) => {
+        console.info('MBTiles DB loaded', ev);
+      });
+      layer.on('databaseerror', (ev: any) => {
+        console.info('MBTiles DB error', ev);
+      });
+
+      // Добавляем слой
+      this.addLayer(file.name, layer);
+    }
   }
 
   addBaseLayer(name: string, layer: L.TileLayer): void {
@@ -78,35 +139,6 @@ export class LayerControlService {
 
     this.layers[name] = layer;
     this.layersControl.addOverlay(layer, name);
-  }
-
-  removeLayer(name: string, isBaseLayer: boolean = true): void {
-    if (!this.layersControl) return;
-
-    if (isBaseLayer && this.baseLayers[name]) {
-      delete this.baseLayers[name];
-    } else if (!isBaseLayer && this.layers[name]) {
-      delete this.layers[name];
-    }
-    this.updateLayersControl();
-  }
-
-  private updateLayersControl(): void {
-    if (!this.layersControl) return;
-
-    const map = this.map;
-    if (!map) return;
-
-    const position = this.layersControl.options.position;
-    const collapsed = this.layersControl.options.collapsed;
-
-    this.layersControl.remove();
-    this.layersControl = L.control
-      .layers(this.baseLayers, this.layers, {
-        position,
-        collapsed,
-      })
-      .addTo(map);
   }
 
   getControlInstance(): L.Control.Layers | null {
