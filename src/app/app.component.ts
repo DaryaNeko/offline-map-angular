@@ -2,7 +2,7 @@ import { Component, AfterViewInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { MapService } from './services/map/map.service';
 import { LayerControlService } from './services/layer-control/layer-control.service';
-
+import initSqlJs from 'sql.js';
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -16,7 +16,15 @@ export class AppComponent implements AfterViewInit {
   constructor(private mapService: MapService) {}
 
   ngAfterViewInit(): void {
-    this.mapService.initializeMap('main-map');
+    initSqlJs({
+      // Required to load the wasm binary asynchronously. Of course, you can host it wherever you want
+      // You can omit locateFile completely when running in node
+      locateFile: (file: any) => `/assets/sql-wasm.wasm`,
+    }).then((sql) => {
+      (window as any).SQL = sql;
+
+      this.mapService.initializeMap('main-map');
+    });
   }
 
   onAddLayerClick(e: Event) {}

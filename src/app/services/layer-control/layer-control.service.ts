@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import * as L from 'leaflet';
+import { MBTiles } from 'leaflet-tilelayer-mbtiles-ts';
 
 @Injectable({
   providedIn: 'root',
@@ -32,60 +33,31 @@ export class LayerControlService {
       .addTo(map);
 
     this.initBaseLayers();
-
-    this.http
-      .get('/assets/countries-raster.mbtiles', { responseType: 'arraybuffer' })
-      .toPromise()
-      .then((response) => {
-        this.addLayer(
-          'mbtile',
-          (L.tileLayer as any).mbTiles(response, {}) as L.Layer
-        );
-      });
+    this.initLayers();
   }
 
-  async loadMBTiles(): Promise<void> {
-    try {
-      // Загружаем файл как ArrayBuffer
-      const arrayBuffer = await this.http
-        .get('./assets/countries-raster.mbtiles', {
-          responseType: 'arraybuffer',
-        })
-        .toPromise();
+  initLayers() {
+    let countriesRaster = new MBTiles(
+      '/assets/countries-raster.mbtiles',
+      {}
+    ) as L.TileLayer;
 
-      if (arrayBuffer) {
-        this.createMBTilesLayer(arrayBuffer);
-      }
-    } catch (error) {
-      console.error('Error loading MBTiles file:', error);
-    }
-  }
+    let layer2 = new MBTiles(
+      '/assets/РазрешениеНаВВод.mbtiles',
+      {}
+    ) as L.TileLayer;
 
-  private createMBTilesLayer(arrayBuffer: ArrayBuffer): void {
-    try {
-      const mbtilesLayer = (L.tileLayer as any).mbtiles(arrayBuffer, {
-        minZoom: 0,
-        maxZoom: 18,
-        attribution: 'MBTiles Data',
-      });
+    // Необязательные подписки
+    countriesRaster.on('databaseloaded', function (ev: any) {
+      console.info('MBTiles DB loaded', ev);
+    });
+    countriesRaster.on('databaseerror', function (ev: any) {
+      console.info('MBTiles DB error', ev);
+    });
 
-      mbtilesLayer.addTo(this.map);
-
-      // Обработчики событий
-      mbtilesLayer.on('ready', () => {
-        console.log('MBTiles layer ready');
-        const bounds = mbtilesLayer.getBounds();
-        if (bounds && bounds.isValid()) {
-          (this.map as L.Map).fitBounds(bounds);
-        }
-      });
-
-      mbtilesLayer.on('error', (error: any) => {
-        console.error('MBTiles error:', error);
-      });
-    } catch (error) {
-      console.error('Error creating MBTiles layer:', error);
-    }
+    // Добавляем слои через сервис
+    this.addLayer('countries-raster', countriesRaster);
+    this.addLayer('Разрешение На ВВод', layer2);
   }
 
   addBaseLayer(name: string, layer: L.TileLayer): void {
