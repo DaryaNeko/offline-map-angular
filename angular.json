@@ -16,13 +16,9 @@
             "baseHref": "/mobile/",
             "allowedCommonJsDependencies": [
               "sql.js",
+              "spl.js",
               "leaflet",
               "leaflet-tilelayer-mbtiles-ts"
-            ],
-            "externalDependencies": [
-              "fs",
-              "path",
-              "crypto"
             ],
             "outputPath": "dist/isogd-pwa",
             "index": "src/index.html",
@@ -118,5 +114,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

@@ -2,21 +2,19 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import * as L from 'leaflet';
 import { MBTiles } from 'leaflet-tilelayer-mbtiles-ts';
+import { WithDbService } from '../with-db/with-db.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class LayerControlService {
+export class LayerControlService extends WithDbService {
   private layersControl: L.Control.Layers | null = null;
   private baseLayers: { [name: string]: L.TileLayer } = {};
   private layers: { [name: string]: L.Layer } = {};
   private map: L.Map | null = null;
-  private idbName = 'mbtilesStorage';
-  private idbVersion = 1;
-  private idb: IDBDatabase | null = null;
 
   constructor(private http: HttpClient) {
-    this.initDatabase();
+    super('mbtilesStorage', 'mbtiles', 'name');
   }
 
   initializeControl(
@@ -34,53 +32,6 @@ export class LayerControlService {
       .addTo(map);
     this.initBaseLayers();
     this.initLayers();
-  }
-
-  private async initDatabase(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.idbName, this.idbVersion);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        this.idb = request.result;
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains('mbtiles')) {
-          db.createObjectStore('mbtiles', { keyPath: 'name' });
-        }
-      };
-    });
-  }
-
-  private async getLayerFromIDB(name: string): Promise<ArrayBuffer | null> {
-    if (!this.idb) return null;
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.idb!.transaction(['mbtiles'], 'readonly');
-      const store = transaction.objectStore('mbtiles');
-      const request = store.get(name);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        resolve(request.result ? request.result.data : null);
-      };
-    });
-  }
-
-  private async saveLayerToIDB(name: string, data: ArrayBuffer): Promise<void> {
-    if (!this.idb) return;
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.idb!.transaction(['mbtiles'], 'readwrite');
-      const store = transaction.objectStore('mbtiles');
-      const request = store.put({ name, data });
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
   }
 
   private async loadLayerFromFile(
@@ -103,12 +54,12 @@ export class LayerControlService {
 
     for (const file of mbtilesFiles) {
       // Проверяем наличие в IndexedDB
-      let fileData = (await this.getLayerFromIDB(file.name)) as ArrayBuffer;
+      let fileData = (await this.getDataFromIDB(file.name)) as ArrayBuffer;
 
       // Если нет в базе - загружаем и сохраняем
       if (!fileData) {
         fileData = (await this.loadLayerFromFile(file.url)) as ArrayBuffer;
-        await this.saveLayerToIDB(file.name, fileData);
+        await this.saveDataToIDB(file.name, fileData);
       }
 
       // Создаем слой из данных

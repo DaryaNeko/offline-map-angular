@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import * as L from 'leaflet';
 import { LayerControlService } from '../layer-control/layer-control.service';
+import { CachedGeoService } from '../cached-geo/cached-geo.service'
 
 @Injectable({
   providedIn: 'root',
@@ -9,7 +10,7 @@ export class MapService implements OnDestroy {
   private map: L.Map | null = null;
   private defaultBaseLayer: string = 'OpenStreetMap';
 
-  constructor(private layerControlService: LayerControlService) {}
+  constructor(private layerControlService: LayerControlService, private cachedGeoService: CachedGeoService) {}
 
   initializeMap(
     containerId: string,
@@ -31,6 +32,8 @@ export class MapService implements OnDestroy {
 
     // Инициализируем контрол слоев
     this.layerControlService.initializeControl(this.map);
+
+    this.cachedGeoService.initCache(this.map);
 
     // Добавляем OSM как базовый слой по умолчанию
 
