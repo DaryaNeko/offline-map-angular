@@ -4,6 +4,29 @@ This project was generated with [Angular CLI](https://github.com/angular/angular
 
 ## Development server
 
+Удалить из angular.json
+```
+"externalDependencies": [
+    "fs",
+    "path",
+    "crypto"
+],
+```
+
+Поправить файл node_modules/leaflet-tilelayer-mbtiles-ts/dist/MBTilesReader.js:
+1. убрать строку 3
+```
+var SQL = require("sql.js");
+```
+2. заменить строку 10
+```
+this.db = new SQL.Database(uInt8Array); 
+```
+на 
+```
+this.db = new window.SQL.Database(uInt8Array);
+```
+
 Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
 
 ## Code scaffolding
